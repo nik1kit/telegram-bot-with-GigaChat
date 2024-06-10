@@ -1,0 +1,48 @@
+from telebot import TeleBot
+from gigachat import GigaChat
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+GIGACHAT_API_KEY = os.getenv('GIGACHAT_API_KEY')
+TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
+class Bot:
+    def __init__(self, tg_token: str, giga_token):
+        self.tg_bot = TeleBot(tg_token)
+        self.giga_bot = (
+            GigaChat(credentials=giga_token, verify_ssl_certs=False))
+
+    def setup_handlers(self):
+        @self.tg_bot.message_handler(commands=['help', 'start'])
+        def start_bot(message):
+            first_mess = \
+                (f"<b>"
+                 f"{message.from_user.first_name} "
+                 f"{message.from_user.last_name if message.from_user.last_name != None else ''}</b>, привет!\n"
+                 f"Задай свой вопрос и я поищу для тебя ответ.")
+
+            (self.tg_bot
+             .send_message(message.chat.id, first_mess, parse_mode='html'))
+
+        @self.tg_bot.message_handler(func=lambda message: True)
+        def response(message):
+            try:
+                answer = self.giga_bot.chat(message.text)
+                resp = answer.choices[0].message.content
+                self.tg_bot.reply_to(message, resp, parse_mode="Markdown")
+            except Exception:
+                self.tg_bot.reply_to(
+                    message,
+                    'Произошла непредвиденная ошибка.',
+                    parse_mode="Markdown"
+                )
+
+    def run(self):
+        self.setup_handlers()
+        self.tg_bot.infinity_polling()
+
+load_dotenv()
+
+tg_giga = Bot(TELEGRAM_TOKEN, GIGACHAT_API_KEY)
+
+tg_giga.run()
